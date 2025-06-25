@@ -1,0 +1,89 @@
+drop database sales;
+-- Create Database and Tables
+CREATE DATABASE IF NOT EXISTS Sales;
+USE Sales;
+
+-- Customer Table
+CREATE TABLE Customer (
+    CustomerID INT AUTO_INCREMENT PRIMARY KEY,
+    CustomerName NVARCHAR(40) NOT NULL,
+    YTDOrders INT NOT NULL DEFAULT 0,
+    YTDSales INT NOT NULL DEFAULT 0
+);
+
+-- Orders Table
+CREATE TABLE Orders (
+    OrderID INT AUTO_INCREMENT PRIMARY KEY,
+    CustomerID INT NOT NULL,
+    OrderDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FilledDate DATETIME NULL,
+    Status CHAR(1) NOT NULL DEFAULT 'O',
+    Amount INT NOT NULL,
+    CONSTRAINT FK_Orders_Customer FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID),
+    CONSTRAINT CK_Orders_FilledDate CHECK ((FilledDate >= OrderDate) AND (FilledDate < '2100-01-01')),
+    CONSTRAINT CK_Orders_OrderDate CHECK ((OrderDate > '2005-01-01') AND (OrderDate < '2100-01-01'))
+);
+
+-- Stored Procedures
+DELIMITER //
+
+CREATE PROCEDURE uspCancelOrder(IN p_OrderID INT)
+BEGIN
+    DECLARE v_Delta INT;
+    DECLARE v_CustomerID INT;
+    
+    START TRANSACTION;
+    SELECT Amount, CustomerID INTO v_Delta, v_CustomerID FROM Orders WHERE OrderID = p_OrderID;
+
+    UPDATE Orders SET Status = 'X' WHERE OrderID = p_OrderID;
+    UPDATE Customer SET YTDOrders = YTDOrders - v_Delta WHERE CustomerID = v_CustomerID;
+    COMMIT;
+END //
+
+CREATE PROCEDURE uspFillOrder(IN p_OrderID INT, IN p_FilledDate DATETIME)
+BEGIN
+    DECLARE v_Delta INT;
+    DECLARE v_CustomerID INT;
+
+    START TRANSACTION;
+    SELECT Amount, CustomerID INTO v_Delta, v_CustomerID FROM Orders WHERE OrderID = p_OrderID;
+
+    UPDATE Orders SET Status = 'F', FilledDate = p_FilledDate WHERE OrderID = p_OrderID;
+    UPDATE Customer SET YTDSales = YTDSales + v_Delta WHERE CustomerID = v_CustomerID;
+    COMMIT;
+END //
+
+CREATE PROCEDURE uspNewCustomer(IN p_CustomerName NVARCHAR(40), OUT p_CustomerID INT)
+BEGIN
+    INSERT INTO Customer (CustomerName) VALUES (p_CustomerName);
+    SET p_CustomerID = LAST_INSERT_ID();
+    
+    -- ADD THIS LINE: Explicitly select the output parameter as a result set
+    SELECT p_CustomerID AS CustomerID; 
+END //
+
+CREATE PROCEDURE uspPlaceNewOrder(IN p_CustomerID INT, IN p_Amount INT, IN p_OrderDate DATETIME, IN p_Status CHAR(1))
+BEGIN
+    DECLARE v_OrderID INT;
+
+    START TRANSACTION;
+    INSERT INTO Orders (CustomerID, OrderDate, FilledDate, Status, Amount)
+    VALUES (p_CustomerID, p_OrderDate, NULL, p_Status, p_Amount);
+
+    SET v_OrderID = LAST_INSERT_ID();
+    UPDATE Customer SET YTDOrders = YTDOrders + p_Amount WHERE CustomerID = p_CustomerID;
+    COMMIT;
+
+    SELECT v_OrderID AS OrderID;
+END //
+
+CREATE PROCEDURE uspShowOrderDetails(IN p_CustomerID INT)
+BEGIN
+    SELECT C.CustomerName, DATE(O.OrderDate) AS OrderDate, DATE(O.FilledDate) AS FilledDate, 
+           O.Status, O.Amount
+    FROM Customer C
+    JOIN Orders O ON O.CustomerID = C.CustomerID
+    WHERE C.CustomerID = p_CustomerID;
+END //
+
+DELIMITER ;
