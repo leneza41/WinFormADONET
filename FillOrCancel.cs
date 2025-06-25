@@ -93,6 +93,9 @@ namespace WinFormADONET
                     using (var connection = new AccesoDatosMySql("localhost", "Sales", "root", "toor", 3306))
                     {
                         connection.ejecutarSentencia(procedureCall, parametros);
+                        const string sql = "SELECT * FROM Orders WHERE OrderID = @orderID";
+                        DataTable dataTable = connection.queryTable(sql, parametros);
+                        this.dgvCustomerOrders.DataSource = dataTable;
                     }
                 }
                 catch (Exception ex)
@@ -124,6 +127,9 @@ namespace WinFormADONET
                     using (var connection = new AccesoDatosMySql("localhost", "Sales", "root", "toor", 3306))
                     {
                         connection.ejecutarSentencia(procedureCall, parametros);
+                        const string sql = "SELECT * FROM Orders WHERE OrderID = @orderID";
+                        DataTable dataTable = connection.queryTable(sql, parametros);
+                        this.dgvCustomerOrders.DataSource = dataTable;
                     }
                 }
                 catch (Exception ex)
